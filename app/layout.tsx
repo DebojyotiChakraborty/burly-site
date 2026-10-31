@@ -12,8 +12,13 @@ export const metadata: Metadata = {
     description: "Lift. Log. Level up. The workout log that keeps up with you.",
   },
   icons: {
-    icon: [{ url: "/media/favicon-64.png", type: "image/png" }],
-    apple: "/media/icon-256.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/media/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/media/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/media/favicon-64.png", sizes: "64x64", type: "image/png" },
+    ],
+    apple: "/media/apple-touch-icon.png",
   },
 };
 
