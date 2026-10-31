@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Burly, the workout log that keeps up with you</title>
+    <meta
+      name="description"
+      content="Burly is a calm, offline workout log for people who lift. Two taps to log a set, every stat explained, strength ranks and badges, nothing leaves your phone."
+    />
+    <meta property="og:title" content="Burly" />
+    <meta property="og:description" content="Lift. Log. Level up. The workout log that keeps up with you." />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f1f2f6" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="media/favicon-64.png" />
+    <link rel="apple-touch-icon" href="media/icon-256.png" />
+    <link rel="preload" href="fonts/GeistSerifVF.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      // Resolve the theme before first paint: a stored choice, else the system.
+      (function () {
+        try {
+          var t = localStorage.getItem("burly-site-theme");
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          document.documentElement.dataset.theme = t;
+          document.documentElement.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-phone" viewBox="0 0 24 24">
+          <rect x="6.5" y="2.5" width="11" height="19" rx="2.2" />
+          <path d="M10 5h4" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></symbol>
+      </defs>
+    </svg>
+
+    <!-- ============================ hero ============================ -->
+    <section class="hero" id="top">
+      <div class="cave" aria-hidden="true">
+        <i></i><i></i><i></i>
+        <div class="rock"></div>
+        <svg class="load-line" viewBox="0 0 1600 400" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="ll" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="currentColor" stop-opacity="0.22" />
+              <stop offset="1" stop-color="currentColor" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M0,300 C80,300 80,240 160,240 C240,240 240,330 320,330 C400,330 400,180 480,180 C560,180 560,260 640,260 C720,260 720,150 800,150 C880,150 880,220 960,220 C1040,220 1040,110 1120,110 C1200,110 1200,190 1280,190 C1360,190 1360,70 1440,70 C1520,70 1520,120 1600,120 L1600,400 L0,400Z"
+            fill="url(#ll)"
+          />
+          <path
+            d="M0,300 C80,300 80,240 160,240 C240,240 240,330 320,330 C400,330 400,180 480,180 C560,180 560,260 640,260 C720,260 720,150 800,150 C880,150 880,220 960,220 C1040,220 1040,110 1120,110 C1200,110 1200,190 1280,190 C1360,190 1360,70 1440,70 C1520,70 1520,120 1600,120"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            vector-effect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+
+      <div class="wrap">
+        <nav class="nav">
+          <a class="logo" href="#top" aria-label="Burly">
+            <img src="media/icon-256.png" width="28" height="28" alt="" />
+            <span>Burly</span>
+          </a>
+          <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#offline">Offline</a>
+          </div>
+          <div class="nav-end">
+            <button
+              class="icon-btn menu-btn"
+              type="button"
+              aria-label="Menu"
+              aria-expanded="false"
+              aria-controls="site-menu"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
+            <div class="menu" id="site-menu" data-open="false">
+              <a href="#features">Features<small>What it does</small></a>
+              <a href="#offline">Offline<small>Where your data lives</small></a>
+            </div>
+            <button
+              class="icon-btn theme"
+              type="button"
+              aria-label="Dark theme"
+              aria-pressed="true"
+              title="Switch theme"
+            >
+              <svg class="moon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z" />
+              </svg>
+              <svg class="sun" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4.2" />
+                <path
+                  d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
+                />
+              </svg>
+            </button>
+            <button class="btn ghost" type="button" data-waitlist="nav">Get notified</button>
+          </div>
+        </nav>
+
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 data-in style="--d: 180">
+              Lift.<br class="br-tall" />
+              Log.<br />
+              <em>Level up.</em>
+            </h1>
+            <p class="sub" data-in style="--d: 300">Fast between sets. Honest with the numbers.</p>
+            <div class="stores" data-in style="--d: 420">
+              <button class="store" type="button" data-waitlist="hero" aria-label="Coming soon to the App Store: get notified">
+                <svg aria-hidden="true"><use href="#i-phone" /></svg>
+                <span><small>Coming soon to</small> <b>App Store</b></span>
+              </button>
+              <button class="store" type="button" data-waitlist="hero" aria-label="Coming soon to Google Play: get notified">
+                <svg aria-hidden="true"><use href="#i-phone" /></svg>
+                <span><small>Coming soon to</small> <b>Google Play</b></span>
+              </button>
+            </div>
+            <div data-in style="--d: 480">
+              <p class="join">
+                <button type="button" data-waitlist="hero">
+                  Join the waitlist
+                  <svg aria-hidden="true"><use href="#i-arrow" /></svg>
+                </button>
+                <span>Get the TestFlight link before anyone else.</span>
+              </p>
+            </div>
+            <div class="laurels" data-in style="--d: 560">
+              <span><b>Offline first.</b> No account, no cloud, no ads.</span>
+              <span><b>Free while in beta</b> · invites go to the waitlist first</span>
+            </div>
+          </div>
+
+          <div class="hero-phone" data-in style="--d: 240">
+            <div class="depth-hero">
+              <div class="depth-scene">
+                <div class="phone">
+                  <span class="key action"></span>
+                  <span class="key vol-up"></span>
+                  <span class="key vol-down"></span>
+                  <span class="key power"></span>
+                  <div class="screen">
+                    <div class="base">
+                      <img data-screen="home" src="media/screens/dark/home.webp" alt="The Burly home screen: this week's rings and the latest sessions" />
+                    </div>
+                    <div class="layer" data-top="0.068" data-height="0.072" aria-hidden="true"></div>
+                    <div class="layer" data-top="0.135" data-height="0.30" aria-hidden="true"></div>
+                    <div class="layer" data-top="0.445" data-height="0.36" aria-hidden="true"></div>
+                    <div class="layer" data-top="0.615" data-height="0.062" aria-hidden="true"></div>
+                  </div>
+                  <span class="island"></span>
+                </div>
+              </div>
+              <div class="depth-labels" aria-hidden="true">
+                <div class="depth-label"><span><b>Burly</b><small>Private, offline, yours</small></span></div>
+                <div class="depth-label"><span><b>Weekly rings</b><small>Days · volume · sets</small></span></div>
+                <div class="depth-label"><span><b>Every session</b><small>One card, records flagged</small></span></div>
+                <div class="depth-label"><span><b>One thumb away</b><small>Home · Workout · Profile</small></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-hint">Scroll</div>
+    </section>
+
+    <!-- ============================ story ============================ -->
+    <section id="features">
+      <div class="wrap story-head" data-reveal>
+        <p class="upper">Eight screens, one scroll</p>
+        <h2>Everything a lifter needs, and nothing that gets in the way.</h2>
+      </div>
+
+      <div class="dstory" style="--steps: 8">
+        <span class="dsnap-free before" aria-hidden="true"></span>
+        <span class="dsnap down" style="--i: 0" aria-hidden="true"></span>
+        <span class="dsnap down" style="--i: 1" aria-hidden="true"></span>
+        <span class="dsnap down" style="--i: 2" aria-hidden="true"></span>
+        <span class="dsnap down" style="--i: 3" aria-hidden="true"></span>
+        <span class="dsnap up" style="--i: 4" aria-hidden="true"></span>
+        <span class="dsnap up" style="--i: 5" aria-hidden="true"></span>
+        <span class="dsnap up" style="--i: 6" aria-hidden="true"></span>
+        <span class="dsnap up" style="--i: 7" aria-hidden="true"></span>
+        <span class="dsnap-free after" aria-hidden="true"></span>
+
+        <div class="dstage">
+          <div class="wrap dstage-inner">
+            <div class="dphone-area">
+              <div class="dphone" role="img" aria-label="Burly on an iPhone: home">
+                <div class="phone">
+                  <span class="key action"></span>
+                  <span class="key vol-up"></span>
+                  <span class="key vol-down"></span>
+                  <span class="key power"></span>
+                  <div class="screen">
+                    <img class="shot" data-screen="home" src="media/screens/dark/home.webp" alt="" />
+                    <img class="shot" data-screen="workout" src="media/screens/dark/workout.webp" alt="" />
+                    <img class="shot" data-screen="routines" src="media/screens/dark/routines.webp" alt="" />
+                    <img class="shot" data-screen="exercise" src="media/screens/dark/exercise.webp" alt="" />
+                    <img class="shot" data-screen="calendar" src="media/screens/dark/calendar.webp" alt="" />
+                    <img class="shot" data-screen="statistics" src="media/screens/dark/statistics.webp" alt="" />
+                    <img class="shot" data-screen="rank_entry" src="media/screens/dark/rank_entry.webp" alt="" />
+                    <img class="shot" data-screen="trophies" src="media/screens/dark/trophies.webp" alt="" />
+                  </div>
+                  <span class="island"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="dcaps">
+              <div class="dcap l on">
+                <span class="num">01 · Home</span>
+                <h3>Your week, in three rings.</h3>
+                <p>Days, volume and sets close as you train. Set a weekly goal, keep the streak, and every session sits below as a card.</p>
+              </div>
+              <div class="dcap r" aria-hidden="true">
+                <span class="num">02 · Live workout</span>
+                <h3>Two taps to log a set.</h3>
+                <p>Last time's weight and reps are already in the row. Tick the set, the rest timer starts, and the next one is waiting.</p>
+              </div>
+              <div class="dcap l" aria-hidden="true">
+                <span class="num">03 · Routines</span>
+                <h3>Routines that run themselves.</h3>
+                <p>Folders, splits and programmes built in. Start a routine and every target is in place before you touch a plate.</p>
+              </div>
+              <div class="dcap r" aria-hidden="true">
+                <span class="num">04 · Progress</span>
+                <h3>Every lift, charted.</h3>
+                <p>Heaviest weight, estimated one-rep max, session volume. Pick a range and read the line. Records are flagged the moment they land.</p>
+              </div>
+              <div class="dcap l" aria-hidden="true">
+                <span class="num">05 · Calendar</span>
+                <h3>Streaks you can see.</h3>
+                <p>Trained days light up, rest days stay quiet. Flip between a month and a whole year of dots.</p>
+              </div>
+              <div class="dcap r" aria-hidden="true">
+                <span class="num">06 · Statistics</span>
+                <h3>Numbers you can trust.</h3>
+                <p>Sets per muscle, muscle distribution and monthly reports, all derived from the sets you logged and nothing else.</p>
+              </div>
+              <div class="dcap l" aria-hidden="true">
+                <span class="num">07 · Strength ranks</span>
+                <h3>Rookie to Immortal.</h3>
+                <p>Rank any lift against blended strength standards and climb the Mastery ladder one tier at a time.</p>
+              </div>
+              <div class="dcap r" aria-hidden="true">
+                <span class="num">08 · Achievements</span>
+                <h3>Badges you earned.</h3>
+                <p>Streaks, milestones and records fill a trophy case. No participation trophies.</p>
+              </div>
+            </div>
+
+            <div class="drail" role="group" aria-label="Features">
+              <button type="button" aria-label="Your week, in three rings." aria-current="true"></button>
+              <button type="button" aria-label="Two taps to log a set."></button>
+              <button type="button" aria-label="Routines that run themselves."></button>
+              <button type="button" aria-label="Every lift, charted."></button>
+              <button type="button" aria-label="Streaks you can see."></button>
+              <button type="button" aria-label="Numbers you can trust."></button>
+              <button type="button" aria-label="Rookie to Immortal."></button>
+              <button type="button" aria-label="Badges you earned."></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ bento ============================ -->
+    <section class="wrap" id="offline">
+      <div class="bento">
+        <div class="cell wide" data-reveal>
+          <svg class="sketch" viewBox="0 0 320 200" aria-hidden="true">
+            <rect x="110" y="12" width="100" height="176" rx="18" />
+            <path d="M140 24h40" />
+            <rect x="124" y="44" width="72" height="26" rx="6" fill="currentColor" fill-opacity="0.22" stroke="none" />
+            <rect x="124" y="80" width="72" height="26" rx="6" fill="currentColor" fill-opacity="0.22" stroke="none" />
+            <rect x="124" y="116" width="72" height="26" rx="6" fill="currentColor" fill-opacity="0.22" stroke="none" />
+            <path d="M40 60c0-9 13-16 30-16s30 7 30 16-13 16-30 16-30-7-30-16z" />
+            <path d="M40 60v60c0 9 13 16 30 16s30-7 30-16V60M40 90c0 9 13 16 30 16s30-7 30-16" />
+            <path d="M250 100h30M265 85v30" stroke-opacity="0.5" />
+          </svg>
+          <h3>Offline first.</h3>
+          <p>No account, no cloud, no ads. Everything lives in a database on your phone, and a JSON backup leaves only when you say so.</p>
+        </div>
+        <div class="cell" data-reveal style="--d: 120">
+          <svg class="sketch" viewBox="0 0 236 200" aria-hidden="true">
+            <g>
+              <circle cx="70" cy="100" r="26" fill="currentColor" fill-opacity="0.22" />
+              <circle cx="70" cy="100" r="46" />
+              <circle cx="70" cy="100" r="66" stroke-opacity="0.5" />
+            </g>
+            <g>
+              <circle cx="160" cy="100" r="26" fill="currentColor" fill-opacity="0.22" />
+              <circle cx="160" cy="100" r="46" />
+              <circle cx="160" cy="100" r="66" stroke-opacity="0.5" />
+            </g>
+          </svg>
+          <div class="kpi">2 taps</div>
+          <h3>To log a set.</h3>
+          <p>Nothing hides behind a menu.</p>
+        </div>
+        <div class="cell" data-reveal>
+          <svg class="sketch" viewBox="0 0 220 200" aria-hidden="true">
+            <rect x="30" y="30" width="160" height="140" rx="10" />
+            <path d="M30 70h160M30 110h160M85 30v140M140 30v140" stroke-opacity="0.6" />
+            <path d="M110 150V50M96 64l14-14 14 14" stroke-width="3.5" />
+          </svg>
+          <div class="kpi">CSV</div>
+          <h3>Bring your history.</h3>
+          <p>Import the export from your old app. Lookalike exercise names are matched for you.</p>
+        </div>
+        <div class="cell wide" data-reveal style="--d: 120">
+          <svg class="sketch" viewBox="0 0 340 200" aria-hidden="true">
+            <rect x="14" y="40" width="120" height="120" rx="22" />
+            <circle cx="74" cy="100" r="34" />
+            <circle cx="74" cy="100" r="22" stroke-opacity="0.5" />
+            <rect x="150" y="40" width="176" height="56" rx="14" />
+            <rect x="150" y="112" width="84" height="48" rx="14" fill="currentColor" fill-opacity="0.22" stroke="none" />
+            <rect x="248" y="112" width="78" height="48" rx="14" />
+            <path d="M168 68h60M240 68h60" stroke-opacity="0.6" />
+          </svg>
+          <h3>Widgets, Live Activity, Liquid Glass.</h3>
+          <p>Twelve home-screen widgets on iPhone and Android, the rest timer in the Dynamic Island, and iOS 26 glass chrome in light and dark.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ cta ============================ -->
+    <section class="cta">
+      <svg class="load-line" viewBox="0 0 1600 400" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          d="M0,300 C80,300 80,240 160,240 C240,240 240,330 320,330 C400,330 400,180 480,180 C560,180 560,260 640,260 C720,260 720,150 800,150 C880,150 880,220 960,220 C1040,220 1040,110 1120,110 C1200,110 1200,190 1280,190 C1360,190 1360,70 1440,70 C1520,70 1520,120 1600,120"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+      <div class="wrap">
+        <h2 data-reveal>Be first under the bar.</h2>
+        <p data-reveal style="--d: 80">Burly is coming to iPhone and Android. Join the waitlist and get the beta first.</p>
+        <div class="stores" data-reveal style="--d: 140">
+          <button class="store" type="button" data-waitlist="cta" aria-label="Coming soon to the App Store: get notified">
+            <svg aria-hidden="true"><use href="#i-phone" /></svg>
+            <span><small>Coming soon to</small> <b>App Store</b></span>
+          </button>
+          <button class="store" type="button" data-waitlist="cta" aria-label="Coming soon to Google Play: get notified">
+            <svg aria-hidden="true"><use href="#i-phone" /></svg>
+            <span><small>Coming soon to</small> <b>Google Play</b></span>
+          </button>
+        </div>
+        <div data-reveal style="--d: 200">
+          <p class="join">
+            <button type="button" data-waitlist="cta">
+              Join the waitlist
+              <svg aria-hidden="true"><use href="#i-arrow" /></svg>
+            </button>
+            <span>Get the TestFlight link before anyone else.</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>© 2026 Burly</span>
+        <span><a href="#">Privacy</a> · <a href="#">Terms</a></span>
+      </div>
+    </footer>
+
+    <!-- ============================ waitlist ============================ -->
+    <div class="wl-overlay" id="waitlist" hidden data-done="false" role="dialog" aria-modal="true" aria-labelledby="wl-title">
+      <div class="wl-dialog">
+        <div class="wl-panel">
+          <div class="wl-head">
+            <span class="upper">Waitlist</span>
+            <button class="icon-btn wl-x" type="button" aria-label="Close">
+              <svg aria-hidden="true"><use href="#i-close" /></svg>
+            </button>
+          </div>
+          <h2 id="wl-title">First in line.</h2>
+          <p class="wl-lede">Leave an email and the TestFlight link reaches you before the store listing goes live.</p>
+          <form class="wl-form" novalidate>
+            <div class="wl-field">
+              <label for="wl-email">Email</label>
+              <input id="wl-email" type="email" name="email" autocomplete="email" placeholder="you@example.com" required />
+            </div>
+            <button class="btn primary wl-submit" type="submit">
+              Join the waitlist
+              <svg aria-hidden="true"><use href="#i-arrow" /></svg>
+            </button>
+          </form>
+          <p class="wl-fine">One email when the beta opens. No newsletter, no sharing.</p>
+          <div class="wl-done">
+            <b>You're on the list.</b>
+            <p>The link lands in your inbox the day the beta opens.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="main.js" defer></script>
+  </body>
+</html>
