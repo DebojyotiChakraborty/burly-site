@@ -132,7 +132,8 @@
 
     const n = layers.length;
     function place(K) {
-      const e = easeOut(K);
+      const lift = parseFloat(getComputedStyle(hero).getPropertyValue("--lift")) || 1;
+      const e = easeOut(K) * lift;
       layers.forEach((layer, i) => {
         const rank = n - i; // the top layer rises furthest
         const z = rank * 36 * e;

@@ -712,6 +712,7 @@ h1[data-in] {
 
 /* hero depth scene: the home screen's cards lift off the phone as layers */
 .depth-hero {
+  --lift: 1; /* how far the layers rise; smaller on phones */
   position: relative;
   width: 100%;
   height: min(72vh, 660px);
@@ -1414,7 +1415,8 @@ footer a:hover {
   }
 
   .depth-hero {
-    height: 300px;
+    --lift: 0.55;
+    height: 320px;
     perspective-origin: 50% 50%;
   }
   .depth-scene {
