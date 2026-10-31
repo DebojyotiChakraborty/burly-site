@@ -16,8 +16,8 @@ theme in `media/screens/{dark,light}/`. To refresh them:
      --dart-define=SAMPLE_PATH=/tmp/shifted.json \
      --dart-define=SHOT_DIR=/tmp/shots/dark --dart-define=SITE_THEME=dark
    ```
-6. Repeat for `light`, then resize the PNGs (1206 x 2622) to 804 x 1748 WebP
-   at quality 84 into `media/screens/<theme>/`.
+6. Repeat for `light`, then `./to_webp.py /tmp/shots/dark ../../media/screens/dark`
+   (and the same for light): 1206 x 2622 PNG to 804 x 1748 WebP at quality 84.
 
 The tour drops a request file per stop; the watcher takes `simctl io screenshot`
 (status bar and Dynamic Island included) and removes the request.
