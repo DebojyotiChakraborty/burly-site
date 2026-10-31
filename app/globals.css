@@ -988,6 +988,12 @@ footer .wrap {
   flex-wrap: wrap;
   gap: 12px;
 }
+footer .credit {
+  margin: 10px auto 0;
+  font-size: 11px;
+  color: var(--text-tertiary, #5e6166);
+}
+
 footer a {
   color: var(--text-dim);
   text-decoration: none;
