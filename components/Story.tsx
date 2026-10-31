@@ -158,8 +158,9 @@ export default function Story() {
       motion.x = s * reach;
       motion.y = lift * 8;
       motion.scale = 1 - lift * 0.04;
-      // as the CSS rotateY did: the edge nearer the caption swings toward the viewer
-      motion.turn = wide ? tilt * REST_ANGLE : 0;
+      // the screen turns toward its caption: phone right, caption left, the
+      // screen faces left (its right edge swings toward the viewer)
+      motion.turn = wide ? -tilt * REST_ANGLE : 0;
       // the screen swaps early in the hand-off, as the reference frames do
       motion.from = from;
       motion.to = to;
