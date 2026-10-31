@@ -47,6 +47,7 @@
   --device-rim: #d2d2d7;
   --device-body: #8e8e93;
   --device-bezel: #0a0a0b;
+  --screen-bg: #000000;
 
   /* motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -94,6 +95,7 @@
   --device-rim: #ffffff;
   --device-body: #c9c9ce;
   --device-bezel: #0a0a0b;
+  --screen-bg: #f1f2f6;
 }
 
 /* ---------- base ---------- */
@@ -718,13 +720,13 @@ h1[data-in] {
 }
 .depth-scene {
   position: absolute;
-  right: 4%;
+  right: 9%;
   top: 50%;
   transform-style: preserve-3d;
-  transform: translateY(-50%) rotateX(12deg) rotateY(-30deg) rotateZ(-8deg);
+  transform: translateY(-50%) rotateX(10deg) rotateY(-26deg) rotateZ(-7deg);
 }
 .depth-scene .phone {
-  --w: min(300px, 38vw);
+  --w: min(268px, 32vw);
   transform-style: preserve-3d;
 }
 .depth-scene .phone .screen {
@@ -732,8 +734,19 @@ h1[data-in] {
   overflow: visible;
 }
 .depth-scene .phone .screen .base {
+  position: absolute;
+  inset: 0;
   border-radius: inherit;
   overflow: hidden;
+}
+.depth-scene .hole {
+  /* where a lifted card used to sit: the page shows through */
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  border-radius: 12px;
+  background: var(--screen-bg);
+  box-shadow: inset 0 0 0 1px rgba(var(--overlay-rgb), 0.06);
 }
 .depth-scene .layer {
   position: absolute;

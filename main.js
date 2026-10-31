@@ -117,6 +117,10 @@
     const DURATION = 2600;
     const easeOut = (s) => 1 - Math.pow(1 - s, 3);
 
+    hero.querySelectorAll(".hole").forEach((hole) => {
+      hole.style.top = `${parseFloat(hole.dataset.top) * 100}%`;
+      hole.style.height = `${parseFloat(hole.dataset.height) * 100}%`;
+    });
     // crop each layer out of the same screenshot
     layers.forEach((layer) => {
       const t = parseFloat(layer.dataset.top);
@@ -131,9 +135,9 @@
       const e = easeOut(K);
       layers.forEach((layer, i) => {
         const rank = n - i; // the top layer rises furthest
-        const z = rank * 46 * e;
-        const x = -rank * 7 * e;
-        const y = -rank * 9 * e;
+        const z = rank * 36 * e;
+        const x = -rank * 6 * e;
+        const y = -rank * 10 * e;
         layer.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
       });
       const box = hero.getBoundingClientRect();
