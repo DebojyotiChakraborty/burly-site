@@ -124,6 +124,7 @@ export default function StoryPhone({
 
   return (
     <Canvas
+      style={{ pointerEvents: "none" }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       camera={{ fov: 30, position: [0, 0, PERSPECTIVE], near: 10, far: PERSPECTIVE * 4 }}

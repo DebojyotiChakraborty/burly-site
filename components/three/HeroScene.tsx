@@ -87,6 +87,9 @@ type Layout = {
 
 type Shared = {
   startAt: number | null;
+  /** The lift waits for both: the site splash done and the scene drawn. */
+  splashDone: boolean;
+  sceneReady: boolean;
   reduced: boolean;
   visible: boolean;
   lastInput: number;
@@ -332,6 +335,16 @@ function Studio() {
   );
 }
 
+// The canvas fades in over this long (CSS) before the lift's clock starts.
+const FADE_MS = 300;
+
+/** Starts the lift once the splash is done and the scene is ready. */
+function startLift(shared: Shared) {
+  if (shared.startAt != null || !shared.splashDone || !shared.sceneReady) return;
+  shared.startAt = performance.now() + FADE_MS;
+  shared.wake();
+}
+
 export default function HeroScene({ onReady }: { onReady?: () => void }) {
   const [awake, setAwake] = useState(true);
   const labelsRef = useRef<HTMLDivElement>(null);
@@ -340,6 +353,8 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
 
   const sharedRef = useRef<Shared>({
       startAt: null,
+      splashDone: false,
+      sceneReady: false,
       reduced: false,
       visible: true,
       lastInput: -Infinity,
@@ -360,7 +375,12 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
       invalidateRef.current();
     };
     shared.sleep = () => setAwake(false);
-    shared.ready = () => onReady?.();
+    shared.ready = () => {
+      onReady?.();
+      if (shared.sceneReady) return;
+      shared.sceneReady = true;
+      startLift(shared);
+    };
   }, [onReady]);
 
   useEffect(() => {
@@ -383,10 +403,9 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
     const html = document.documentElement;
     let mo: MutationObserver | null = null;
     const go = () => {
-      if (shared.startAt != null) return;
-      shared.startAt = performance.now();
       mo?.disconnect();
-      shared.wake();
+      shared.splashDone = true;
+      startLift(shared);
     };
     let played = false;
     try {
@@ -413,8 +432,10 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
         box.style.left = box.style.top = box.style.width = box.style.height = box.style.right = box.style.bottom = "";
         const bw = hero.clientWidth;
         const bh = hero.clientHeight;
-        const phonePx = Math.min(bh * 0.8, bw * 0.85);
-        const at = new Vector2(bw * 0.5 - box.offsetLeft, bh * 0.52 - box.offsetTop);
+        // as the reference on phones: the scene fills the space under the
+        // copy, the phone a little right of centre and low, cards fanning up-left
+        const phonePx = Math.min(bh * 0.86, bw * 1.05);
+        const at = new Vector2(bw * 0.56 - box.offsetLeft, bh * 0.56 - box.offsetTop);
         shared.layout = { offX: box.offsetLeft, offY: box.offsetTop, phonePx, rest: at, lifted: at.clone(), mobile: true, lift };
       } else {
         const hs = section.clientHeight;
@@ -483,6 +504,7 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
     <>
       <div className="depth-canvas" ref={boxRef}>
         <Canvas
+          style={{ pointerEvents: "none" }}
           dpr={[1, 2]}
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
           camera={{ fov: FOV, position: [0, 0, DISTANCE], near: 0.1, far: 20 }}
