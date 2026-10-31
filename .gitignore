@@ -2,3 +2,16 @@
 node_modules/
 *.log
 .claude/
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# misc
+/coverage
+*.pem
+.env*
+.vercel
