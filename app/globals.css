@@ -988,10 +988,51 @@ footer .wrap {
   flex-wrap: wrap;
   gap: 12px;
 }
+footer .foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 footer .credit {
-  margin: 10px auto 0;
-  font-size: 11px;
+  position: relative;
+  display: inline-flex;
+}
+footer .credit summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
   color: var(--text-faint);
+  cursor: pointer;
+}
+footer .credit summary::-webkit-details-marker {
+  display: none;
+}
+footer .credit summary:hover,
+footer .credit[open] summary {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+footer .credit-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  width: max-content;
+  max-width: min(320px, 80vw);
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  z-index: 5;
 }
 
 footer a {
