@@ -1,10 +1,16 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { clamp, reducedMotion } from "@/lib/motion";
 import { vars } from "@/lib/style";
-import { screenSrc, useTheme } from "@/lib/theme";
+import { currentTheme, screenSrc, useTheme } from "@/lib/theme";
+import type { StoryMotion, StoryPhoneApi } from "./three/StoryPhone";
+import { preloadTextures } from "./three/textures";
+
+// three.js only runs in the browser; a flat capture stands in until then.
+const StoryPhone = dynamic(() => import("./three/StoryPhone"), { ssr: false });
 
 const STEPS = [
   {
@@ -59,19 +65,31 @@ const STEPS = [
 
 type Tween = { from: number; to: number; start: number; up: boolean; cut: boolean };
 
+const SCREENS = STEPS.map((s) => s.screen);
+
 /* The scroll story: a sticky stage over a tall scroller, one step per
    feature, a 750 ms ease-in-out-cubic hand-off between features during which
    the phone swaps sides and the caption fades. */
 export default function Story() {
   const theme = useTheme();
   const storyRef = useRef<HTMLDivElement>(null);
+  // Written by the scroll loop below, read by the 3D phone when it draws.
+  const [motion] = useState<StoryMotion>(() => ({ cx: 0, cy: 0, h: 0, x: 0, y: 0, scale: 1, turn: 0, from: 0, to: 0, swap: 1 }));
+  const phoneApi = useRef<StoryPhoneApi | null>(null);
+  const redraw = useRef<() => void>(() => {});
+  const [ready, setReady] = useState(false);
+  const onPhoneReady = (api: StoryPhoneApi) => {
+    phoneApi.current = api;
+    setReady(true);
+    redraw.current();
+  };
 
   useEffect(() => {
     const story = storyRef.current;
     if (!story) return;
     const stage = story.querySelector<HTMLElement>(".dstage")!;
     const phone = story.querySelector<HTMLElement>(".dphone")!;
-    const shots = Array.from(story.querySelectorAll<HTMLElement>(".shot"));
+    preloadTextures(SCREENS.map((s) => screenSrc(s, currentTheme())));
     const caps = Array.from(story.querySelectorAll<HTMLElement>(".dcap"));
     const dots = Array.from(story.querySelectorAll<HTMLButtonElement>(".drail button"));
     const reduced = reducedMotion();
@@ -82,6 +100,8 @@ export default function Story() {
     const HYST = 0.1; // how far past a step edge the scroll must go
     const REST_ANGLE = 9; // degrees the phone turns toward its caption
     const easeInOutCubic = (s: number) => (s < 0.5 ? 4 * s * s * s : 1 - Math.pow(-2 * s + 2, 3) / 2);
+    // the turn eases a touch softer than the slide, and never overshoots
+    const smoother = (s: number) => s * s * s * (s * (s * 6 - 15) + 10);
     const side = (i: number) => (i % 2 === 0 ? 1 : -1); // even steps: phone right, caption left
     const rest = (i: number): Tween => ({ from: i, to: i, start: 0, up: false, cut: false });
 
@@ -127,16 +147,24 @@ export default function Story() {
       const wide = window.matchMedia("(min-width: 861px)").matches;
       const reach = wide ? Math.min(stage.clientWidth * 0.24, 290) : 0;
       const s = side(from) + (side(to) - side(from)) * Mt;
+      const tilt = side(from) + (side(to) - side(from)) * smoother(rn);
       const lift = Math.sin(Math.PI * Mt);
-      phone.style.transform = `translate3d(${s * reach}px, ${-lift * 8}px, 0) scale(${1 - lift * 0.04})`;
-      const inner = phone.firstElementChild as HTMLElement | null;
-      if (inner) inner.style.transform = `rotateY(${wide ? s * REST_ANGLE : 0}deg)`;
 
+      // The 3D phone: its resting box is the .dphone element (never
+      // transformed now); the slide, rise, scale and turn happen in the scene.
+      motion.cx = phone.offsetLeft + phone.offsetWidth / 2;
+      motion.cy = phone.offsetTop + phone.offsetHeight / 2;
+      motion.h = phone.offsetHeight;
+      motion.x = s * reach;
+      motion.y = lift * 8;
+      motion.scale = 1 - lift * 0.04;
+      // as the CSS rotateY did: the edge nearer the caption swings toward the viewer
+      motion.turn = wide ? tilt * REST_ANGLE : 0;
       // the screen swaps early in the hand-off, as the reference frames do
-      const swap = from === to ? 1 : clamp((rn - 0.04) / 0.12);
-      shots.forEach((img, i) => {
-        img.style.opacity = String(i === to ? swap : i === from ? 1 - swap : 0);
-      });
+      motion.from = from;
+      motion.to = to;
+      motion.swap = from === to ? 1 : clamp((rn - 0.04) / 0.12);
+      phoneApi.current?.invalidate();
 
       const cap = from === to ? to : rn < 0.12 && !cut ? from : rn > 0.88 ? to : -1;
       caps.forEach((c, i) => {
@@ -169,6 +197,7 @@ export default function Story() {
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(tick);
     };
+    redraw.current = schedule;
 
     function scrollToStep(i: number) {
       const top = story!.getBoundingClientRect().top + window.scrollY;
@@ -271,8 +300,9 @@ export default function Story() {
       stage.removeEventListener("pointercancel", pointerCancel);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", schedule);
+      redraw.current = () => {};
     };
-  }, []);
+  }, [motion]);
 
   return (
     <section id="features">
@@ -289,21 +319,13 @@ export default function Story() {
         <span className="dsnap-free after" aria-hidden="true"></span>
 
         <div className="dstage">
-          <div className="wrap dstage-inner">
+          <div className={`wrap dstage-inner${ready ? " is-ready" : ""}`}>
+            <div className="dphone-canvas" aria-hidden="true">
+              <StoryPhone motion={motion} screens={SCREENS} onReady={onPhoneReady} />
+            </div>
             <div className="dphone-area">
               <div className="dphone" role="img" aria-label="Burly on an iPhone: home">
-                <div className="phone">
-                  <span className="key action"></span>
-                  <span className="key vol-up"></span>
-                  <span className="key vol-down"></span>
-                  <span className="key power"></span>
-                  <div className="screen">
-                    {STEPS.map((s) => (
-                      <img key={s.screen} className="shot" data-screen={s.screen} src={screenSrc(s.screen, theme)} alt="" />
-                    ))}
-                  </div>
-                  <span className="island"></span>
-                </div>
+                <img className="dphone-fallback" src={screenSrc(STEPS[0].screen, theme)} alt="" />
               </div>
             </div>
 
