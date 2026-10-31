@@ -78,6 +78,13 @@ export default function Story() {
   const phoneApi = useRef<StoryPhoneApi | null>(null);
   const redraw = useRef<() => void>(() => {});
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // the flat capture only stands in if the 3D phone never arrives
+  useEffect(() => {
+    if (ready) return;
+    const t = window.setTimeout(() => setFailed(true), 6000);
+    return () => window.clearTimeout(t);
+  }, [ready]);
   const onPhoneReady = (api: StoryPhoneApi) => {
     phoneApi.current = api;
     setReady(true);
@@ -91,7 +98,9 @@ export default function Story() {
     const phone = story.querySelector<HTMLElement>(".dphone")!;
     preloadTextures(SCREENS.map((s) => screenSrc(s, currentTheme())));
     const caps = Array.from(story.querySelectorAll<HTMLElement>(".dcap"));
-    const dots = Array.from(story.querySelectorAll<HTMLButtonElement>(".drail button"));
+    const dots = Array.from(story.querySelectorAll<HTMLButtonElement>(".drail .dot"));
+    const skipBtn = story.querySelector<HTMLButtonElement>(".dstep.skip");
+    const topBtn = story.querySelector<HTMLButtonElement>(".dstep.top");
     const reduced = reducedMotion();
     const N = caps.length;
     story.style.setProperty("--steps", String(N));
@@ -131,7 +140,9 @@ export default function Story() {
 
     const progressRaw = () => {
       const r = story.getBoundingClientRect();
-      return (-r.top / (r.height - window.innerHeight)) * N;
+      // the stage is 100svh tall; measure against it rather than the window,
+      // which grows and shrinks with mobile Safari's toolbars
+      return (-r.top / (r.height - stage.offsetHeight)) * N;
     };
     const progress = () => clamp(progressRaw(), 0, N);
 
@@ -202,9 +213,17 @@ export default function Story() {
 
     function scrollToStep(i: number) {
       const top = story!.getBoundingClientRect().top + window.scrollY;
-      const span = story!.offsetHeight - window.innerHeight;
+      const span = story!.offsetHeight - stage.offsetHeight;
       window.scrollTo({ top: top + (span * (i + 0.5)) / N, behavior: "instant" });
     }
+    // as the reference: on phones, one arrow skips the tour, one goes back up
+    const onSkip = () => {
+      const below = story!.getBoundingClientRect().bottom + window.scrollY;
+      window.scrollTo({ top: below, behavior: "smooth" });
+    };
+    const onTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+    skipBtn?.addEventListener("click", onSkip);
+    topBtn?.addEventListener("click", onTop);
     const dotClicks = dots.map((d, i) => {
       const fn = () => scrollToStep(i);
       d.addEventListener("click", fn);
@@ -289,6 +308,8 @@ export default function Story() {
       window.clearTimeout(snapTimer);
       window.clearTimeout(snapFallback);
       dots.forEach((d, i) => d.removeEventListener("click", dotClicks[i]));
+      skipBtn?.removeEventListener("click", onSkip);
+      topBtn?.removeEventListener("click", onTop);
       window.removeEventListener("touchstart", touchStart);
       window.removeEventListener("touchend", touchEnd);
       window.removeEventListener("touchcancel", touchEnd);
@@ -326,7 +347,10 @@ export default function Story() {
             </div>
             <div className="dphone-area">
               <div className="dphone" role="img" aria-label="Burly on an iPhone: home">
-                <img className="dphone-fallback" src={screenSrc(STEPS[0].screen, theme)} alt="" />
+                {failed && !ready && <img className="dphone-fallback" src={screenSrc(STEPS[0].screen, theme)} alt="" />}
+                <noscript>
+                  <img className="dphone-fallback" src={screenSrc(STEPS[0].screen, "dark")} alt="" />
+                </noscript>
               </div>
             </div>
 
@@ -345,9 +369,19 @@ export default function Story() {
             </div>
 
             <div className="drail" role="group" aria-label="Features">
+              <button type="button" className="dstep skip" aria-label="Skip past the features">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12l7 7 7-7" />
+                </svg>
+              </button>
               {STEPS.map((s, i) => (
-                <button key={s.screen} type="button" aria-label={s.title} aria-current={i === 0 ? "true" : undefined}></button>
+                <button key={s.screen} type="button" className="dot" aria-label={s.title} aria-current={i === 0 ? "true" : undefined}></button>
               ))}
+              <button type="button" className="dstep top" aria-label="Back to top">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
