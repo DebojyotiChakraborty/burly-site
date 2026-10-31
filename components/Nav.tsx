@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useEffect, useRef, useState } from "react";
 import { applyTheme, currentTheme, useSystemThemeFollow, useTheme } from "@/lib/theme";
@@ -33,14 +34,14 @@ export default function Nav() {
 
   return (
     <nav className="nav">
-      <a className="logo" href="#top" aria-label="Burly">
+      <Link className="logo" href="/#top" aria-label="Burly">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/media/icon-256.png" width={28} height={28} alt="" />
         <span>Burly</span>
-      </a>
+      </Link>
       <div className="nav-links">
-        <a href="#features">Features</a>
-        <a href="#offline">Offline</a>
+        <Link href="/#features">Features</Link>
+        <Link href="/#offline">Offline</Link>
       </div>
       <div className="nav-end">
         <button
@@ -57,12 +58,12 @@ export default function Nav() {
           </svg>
         </button>
         <div ref={menu} className="menu" id="site-menu" data-open={open ? "true" : "false"}>
-          <a href="#features" onClick={() => setOpen(false)}>
+          <Link href="/#features" onClick={() => setOpen(false)}>
             Features<small>What it does</small>
-          </a>
-          <a href="#offline" onClick={() => setOpen(false)}>
+          </Link>
+          <Link href="/#offline" onClick={() => setOpen(false)}>
             Offline<small>Where your data lives</small>
-          </a>
+          </Link>
         </div>
         <button
           className="icon-btn theme"

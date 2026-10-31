@@ -1,3 +1,4 @@
+import Link from "next/link";
 export default function Footer() {
   return (
     <footer>
@@ -34,7 +35,7 @@ export default function Footer() {
           </details>
         </span>
         <span>
-          <a href="#">Privacy</a> · <a href="#">Terms</a>
+          <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link>
         </span>
       </div>
     </footer>
