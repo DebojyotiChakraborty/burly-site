@@ -1,0 +1,97 @@
+/*
+ * Static styles for SiteSplash. The server-rendered markup alone is the
+ * resting frame (field + mascot), so the very first paint is the icon. Once
+ * the component mounts, the canvas takes over and these layers are hidden.
+ */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  contain: strict;
+  container-type: size;
+  /* Safety net when JavaScript never hydrates: the overlay fades away by
+     itself. The component switches this off as soon as it mounts. */
+  animation: burlySplashSafety 240ms ease-in 8s forwards;
+}
+
+.root[data-js] {
+  animation: none;
+}
+
+/* From the moment the page starts to show through, input goes to the page. */
+.root[data-reveal] {
+  pointer-events: none;
+}
+
+/* Already played in this session (set before hydration by the inline
+   script), or finished. */
+:global(html[data-splash="done"]) .root {
+  display: none;
+}
+
+/* The glass-blue icon's background, cover-mapped: a square of side
+   max(width, height) centred on the viewport, gradient top to bottom. */
+.field {
+  position: absolute;
+  inset: 0;
+  background-color: #2e72ff;
+  background-image: linear-gradient(180deg, #1236f0 0%, #2e72ff 55%, #92d2ff 100%);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: max(100vw, 100vh) max(100vw, 100vh);
+  background-size: max(100cqw, 100cqh) max(100cqw, 100cqh);
+}
+
+/* The resting mascot: 24 % of the viewport's shorter side, clamped to
+   144..216 px (every phone gets the app's 144); its centre sits 33/144 of its
+   side above the viewport's centre. The canvas uses the same numbers. */
+.mascot {
+  --side: clamp(144px, 24vmin, 216px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--side);
+  height: var(--side);
+  max-width: none;
+  transform: translate(-50%, calc(-50% - var(--side) * 0.2291667));
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+@supports (width: 1cqmin) {
+  .mascot {
+    --side: clamp(144px, 24cqmin, 216px);
+  }
+}
+
+.root[data-nomascot] .mascot {
+  visibility: hidden;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  visibility: hidden;
+}
+
+.root[data-canvas] .canvas {
+  visibility: visible;
+}
+
+.root[data-canvas] .field,
+.root[data-canvas] .mascot {
+  visibility: hidden;
+}
+
+@keyframes burlySplashSafety {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
