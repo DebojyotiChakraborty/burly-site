@@ -617,138 +617,44 @@ h1[data-in] {
   }
 }
 
-/* ---------- the phone ---------- */
-/* A CSS iPhone: body, bezel, screen, island, buttons. --w is the body width;
-   every other size follows from it (iPhone 17 proportions, 71.5 x 149.6 mm,
-   screen 402 x 874 pt). */
-.phone {
-  --w: 300px;
-  position: relative;
-  width: var(--w);
-  aspect-ratio: 71.5 / 149.6;
-  border-radius: calc(var(--w) * 0.165);
-  background: linear-gradient(135deg, var(--device-rim), var(--device-body) 55%, var(--device-rim));
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    0 30px 60px -20px rgba(var(--shade-rgb), calc(0.6 * var(--shade-k)));
-}
-.phone::before {
-  /* the bezel */
-  content: "";
-  position: absolute;
-  inset: calc(var(--w) * 0.012);
-  border-radius: calc(var(--w) * 0.153);
-  background: var(--device-bezel);
-}
-.phone .screen {
-  position: absolute;
-  left: 4.3%;
-  right: 4.3%;
-  top: 2.5%;
-  bottom: 2.5%;
-  border-radius: calc(var(--w) * 0.13);
-  overflow: hidden;
-  background: #000;
-}
-.phone .screen img,
-.phone .screen .shot {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.phone .island {
-  position: absolute;
-  left: 50%;
-  top: calc(2.5% + 100% * 0.95 * 11 / 874);
-  width: calc(91.4% * 126 / 402);
-  height: calc(95% * 37 / 874);
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: #000;
-  z-index: 3;
-}
-.phone .key {
-  position: absolute;
-  width: calc(var(--w) * 0.012);
-  border-radius: 2px;
-  background: var(--device-body);
-}
-.phone .key.action {
-  left: calc(var(--w) * -0.01);
-  top: 17%;
-  height: 3.5%;
-}
-.phone .key.vol-up {
-  left: calc(var(--w) * -0.01);
-  top: 23%;
-  height: 6.5%;
-}
-.phone .key.vol-down {
-  left: calc(var(--w) * -0.01);
-  top: 31%;
-  height: 6.5%;
-}
-.phone .key.power {
-  right: calc(var(--w) * -0.01);
-  top: 25%;
-  height: 10%;
-}
-
 /* hero depth scene: the home screen's cards lift off the phone as layers */
 .depth-hero {
   --lift: 1; /* how far the layers rise; smaller on phones */
   position: relative;
   width: 100%;
   height: min(72vh, 660px);
-  perspective: 1500px;
-  perspective-origin: 60% 45%;
 }
-.depth-scene {
+.depth-canvas {
+  /* bleeds past the box so the lifted cards are never clipped */
   position: absolute;
-  right: 9%;
+  inset: -22% -4% -8% -40%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 400ms var(--ease);
+}
+.depth-hero.is-ready .depth-canvas {
+  opacity: 1;
+}
+.depth-fallback {
+  /* the plain capture, before (or without) WebGL */
+  position: absolute;
+  right: 16%;
   top: 50%;
-  transform-style: preserve-3d;
-  transform: translateY(-50%) rotateX(10deg) rotateY(-26deg) rotateZ(-7deg);
+  height: 84%;
+  aspect-ratio: 804 / 1748;
+  border-radius: 9% / 4.2%;
+  border: 6px solid var(--device-bezel);
+  box-shadow: 0 0 0 2px var(--device-rim);
+  transform: translateY(-50%);
+  object-fit: cover;
+  transition: opacity 400ms var(--ease);
 }
-.depth-scene .phone {
-  --w: min(268px, 32vw);
-  transform-style: preserve-3d;
-}
-.depth-scene .phone .screen {
-  transform-style: preserve-3d;
-  overflow: visible;
-}
-.depth-scene .phone .screen .base {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  overflow: hidden;
-}
-.depth-scene .hole {
-  /* where a lifted card used to sit: the page shows through */
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  border-radius: 12px;
-  background: var(--screen-bg);
-  box-shadow: inset 0 0 0 1px rgba(var(--overlay-rgb), 0.06);
-}
-.depth-scene .layer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  overflow: hidden;
-  border-radius: 12px;
-  background-size: 100% auto;
-  background-repeat: no-repeat;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 24px 40px -18px rgba(0, 0, 0, 0.7);
-  will-change: transform;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
+.depth-hero.is-ready .depth-fallback {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 400ms var(--ease),
+    visibility 0s 400ms;
 }
 .depth-labels {
   position: absolute;
@@ -837,29 +743,38 @@ h1[data-in] {
   display: contents;
 }
 .dphone {
+  /* the phone's resting box: the 3D phone is drawn here, never moved by CSS */
   position: relative;
   height: min(80vh, 820px);
   aspect-ratio: 71.5 / 149.6;
-  perspective: 1800px;
-  will-change: transform;
 }
-.dphone .phone {
-  --w: 100%;
-  width: 100%;
-  height: 100%;
-  border-radius: 15.5% / 7.4%;
-  transform-style: preserve-3d;
-  transition: none;
-}
-.dphone .phone::before {
-  inset: 1.2% 2.4%;
-  border-radius: 14.5% / 6.9%;
-}
-.dphone .phone .screen {
-  border-radius: 13% / 6%;
-}
-.dphone .phone .screen .shot {
+.dphone-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   opacity: 0;
+  transition: opacity 400ms var(--ease);
+}
+.dstage-inner.is-ready .dphone-canvas {
+  opacity: 1;
+}
+.dphone-fallback {
+  /* the first capture, before (or without) WebGL */
+  position: absolute;
+  inset: 2.5% 4.3%;
+  width: 91.4%;
+  height: 95%;
+  border-radius: 13% / 6%;
+  object-fit: cover;
+  box-shadow: 0 0 0 5px var(--device-bezel), 0 0 0 7px var(--device-rim);
+  transition: opacity 400ms var(--ease);
+}
+.dstage-inner.is-ready .dphone-fallback {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 400ms var(--ease),
+    visibility 0s 400ms;
 }
 .dcap {
   position: absolute;
@@ -1403,15 +1318,14 @@ footer a:hover {
   .depth-hero {
     --lift: 0.55;
     height: 320px;
-    perspective-origin: 50% 50%;
   }
-  .depth-scene {
+  .depth-canvas {
+    inset: -12% -16px -4%;
+  }
+  .depth-fallback {
     right: auto;
     left: 50%;
-    transform: translate(-50%, -50%) rotateX(10deg) rotateY(-24deg) rotateZ(-6deg);
-  }
-  .depth-scene .phone {
-    --w: 150px;
+    transform: translate(-50%, -50%);
   }
   .depth-labels {
     display: none;
