@@ -2,27 +2,13 @@
    Tokens come from the app's theme (lib/app/theme/app_theme_data.dart):
    black page with #1C1C1E cards in dark, grey page with white cards in light,
    one blue accent, 1 px outlines, no shadows on surfaces. Type is Geist Serif
-   for display and Geist Mono for everything else. */
-
-@font-face {
-  font-family: "Geist Mono";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("fonts/GeistMono-Variable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Geist Serif";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("fonts/GeistSerifVF.woff2") format("woff2");
-}
+   for display and Geist Mono for everything else. Both are loaded with
+   next/font/local, which exposes them as --font-serif and --font-mono. */
 
 :root {
   color-scheme: dark;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-serif: "Geist Serif", "Iowan Old Style", "Times New Roman", serif;
+  /* --font-mono and --font-serif come from next/font/local (app/fonts.ts),
+     set on <html> with the same fallback stacks as before. */
 
   /* dark palette = the app's dark theme */
   --bg: #000000;
