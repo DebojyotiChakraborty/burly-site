@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { geistMono, geistSerif } from "./fonts";
+import SiteSplash from "@/components/splash/SiteSplash";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -49,7 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <SiteSplash />
+        {children}
+      </body>
     </html>
   );
 }
