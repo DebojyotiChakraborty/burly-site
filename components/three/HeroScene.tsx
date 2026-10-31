@@ -3,7 +3,7 @@
 import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { BackSide, Group, MathUtils, Mesh, PerspectiveCamera, Texture, Vector2, Vector3 } from "three";
+import { BackSide, Euler, Group, MathUtils, Mesh, PerspectiveCamera, Quaternion, Texture, Vector2, Vector3 } from "three";
 import { clamp, reducedMotion } from "@/lib/motion";
 import { screenSrc, useTheme } from "@/lib/theme";
 import Device, { SCREEN } from "./Device";
@@ -37,31 +37,53 @@ const START = 500;
 const DURATION = 2600;
 const easeOut = (s: number) => 1 - Math.pow(1 - s, 3);
 
-/* The pose, matched by eye to ooft's hero (frame 64): pitched back so the
-   bottom edge shows, turned so the screen faces left (the right side and
-   its buttons show), and rolled clockwise so the top leans right. Euler
-   order YXZ, on a phone whose screen faces +Z. */
-const POSE: [number, number, number, "YXZ"] = [
-  MathUtils.degToRad(-38),
-  MathUtils.degToRad(-26),
-  MathUtils.degToRad(-22),
-  "YXZ",
-];
+/* The device pose, Euler YXZ on a phone whose screen faces +Z, animated
+   from REST (before the lift) to LIFTED (at its end) on the lift's clock
+   (slerped, same ease). Both matched by eye to ooft's hero recording
+   (frames l_006 and l_036): nearly face-on and leaning right at rest, then
+   pitched back with the bottom edge and right side showing. */
+const REST_POSE = new Vector3(-30, -24, -32);
+const LIFTED_POSE = new Vector3(-46, -12, -24);
 
 const FOV = 35;
 const DISTANCE = 1.85; // camera distance, in phone heights
 
-/* Each card's rise at the end of the clock, per rank (the top card has rank
-   4), in phone heights along the screen's own axes. The CSS version used
-   (-6, -10, 36) px on a 560 px phone. */
-const PER_RANK = new Vector3(-6, 10, 36).divideScalar(560);
-const DEPTH = 1.3; // how much further than the CSS version the cards rise
+/* Desktop layout, from the same recording (1344 x 765 viewport, 1120 px
+   content column): the phone is 0.607 of the hero's height; its centre was
+   measured at 78.5 % / 77.2 % across the content column and 62.1 % / 58.5 %
+   down the hero (rest / lifted), nudged right here so the labels clear our
+   wider mono copy. */
+const PHONE_OF_HERO = 0.607;
+const REST_AT = new Vector2(0.8, 0.621);
+const LIFTED_AT = new Vector2(0.79, 0.6);
+
+/* Each card's offset at the end of the lift, in phone heights along the
+   screen's own axes (x right, y up the phone, z toward the viewer):
+   BASE + rank * PER_RANK, rank 4 for the top card down to 1. */
+const BASE = new Vector3(-0.02, 0, 0.05);
+const PER_RANK = new Vector3(-0.012, 0.055, 0.085);
+
+const eulerOf = (v: Vector3) => new Euler(MathUtils.degToRad(v.x), MathUtils.degToRad(v.y), MathUtils.degToRad(v.z), "YXZ");
+const REST_Q = new Quaternion().setFromEuler(eulerOf(REST_POSE));
+const LIFTED_Q = new Quaternion().setFromEuler(eulerOf(LIFTED_POSE));
 
 const IDLE_DEG = 1.5;
 const IDLE_PERIOD = 6; // s
 const POINTER_DEG = 3;
 const FOLLOW = 0.08; // lerp per 60 Hz frame
 const SETTLE_MS = 1600; // after the last pointer move, the loop winds down
+
+/** Where things go, in canvas pixels, measured on resize. */
+type Layout = {
+  /** The canvas's offset inside the .depth-hero box (labels live there). */
+  offX: number;
+  offY: number;
+  phonePx: number;
+  rest: Vector2;
+  lifted: Vector2;
+  mobile: boolean;
+  lift: number;
+};
 
 type Shared = {
   startAt: number | null;
@@ -72,25 +94,40 @@ type Shared = {
   labels: (HTMLDivElement | null)[];
   hero: HTMLElement | null;
   canvasBox: HTMLElement | null;
+  layout: Layout | null;
   wake: () => void;
   sleep: () => void;
   ready: () => void;
 };
+
+/** [el]'s offset inside [ancestor], which must be on its offsetParent chain. */
+function offsetIn(el: HTMLElement, ancestor: HTMLElement) {
+  let x = 0;
+  let y = 0;
+  let n: HTMLElement | null = el;
+  while (n && n !== ancestor) {
+    x += n.offsetLeft;
+    y += n.offsetTop;
+    n = n.offsetParent as HTMLElement | null;
+  }
+  return { x, y };
+}
 
 /** Points the screen and the cards at [home] and colours them for the theme. */
 function dressScene(screen: ScreenMaterial, cards: CardMaterial[], shadows: ShadowMaterial[], home: Texture, light: boolean) {
   screen.uniforms.mapA.value = home;
   screen.uniforms.mapB.value = home;
   screen.uniforms.mixAmt.value = 1;
-  screen.uniforms.seatColor.value.set(light ? "#f1f2f6" : "#000000");
+  // the seat a card leaves: a shade darker than the screen, with a hairline
+  screen.uniforms.seatColor.value.set(light ? "#e2e4ea" : "#000000");
   screen.uniforms.rimColor.value.set(light ? "#000000" : "#ffffff");
-  screen.uniforms.rimAlpha.value = 0.06;
+  screen.uniforms.rimAlpha.value = light ? 0.1 : 0.14;
   cards.forEach((m) => {
     m.uniforms.map.value = home;
     m.uniforms.rimColor.value.set(light ? "#000000" : "#ffffff");
     m.uniforms.rimAlpha.value = light ? 0.06 : 0.1;
   });
-  shadows.forEach((m) => (m.userData.k = light ? 0.16 : 0.55));
+  shadows.forEach((m) => (m.userData.k = light ? 0.26 : 0.7));
 }
 
 function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
@@ -103,8 +140,9 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
   const rig = useRef<Group>(null);
   const cards = useRef<(Mesh | null)[]>([]);
   const shadows = useRef<(Mesh | null)[]>([]);
-  const state = useRef({ offX: 0, offY: 0, act: 1, driftT: 0, cur: new Vector2(), lift: 1, w: 0, h: 0, mobile: false, scale: 1, awake: true, on: [] as boolean[] });
+  const state = useRef({ act: 1, driftT: 0, cur: new Vector2(), awake: true, on: [] as boolean[] });
   const v = useMemo(() => new Vector3(), []);
+  const pose = useRef<Group>(null);
 
   const screen = useMemo(() => {
     const m = createScreenMaterial(SCREEN.w / SCREEN.h);
@@ -131,7 +169,7 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
       CARDS.map((c) => {
         const m = createShadowMaterial();
         m.uniforms.size.value.set(SCREEN.w * 0.92, SCREEN.h * c.height);
-        m.uniforms.pad.value.set(0.035, 0.035);
+        m.uniforms.pad.value.set(0.1, 0.1);
         return m;
       }),
     [],
@@ -157,47 +195,49 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
     const st = state.current;
     const now = performance.now();
 
-    // layout: on a resize, read the box and fit the phone. The canvas bleeds
-    // past the box (up and left) so lifted cards are never clipped.
-    if (size.width !== st.w || size.height !== st.h) {
-      st.w = size.width;
-      st.h = size.height;
-      const hero = shared.hero;
-      const canvasBox = shared.canvasBox;
-      st.offX = canvasBox?.offsetLeft ?? 0;
-      st.offY = canvasBox?.offsetTop ?? 0;
-      const bw = hero?.clientWidth ?? st.w;
-      const bh = hero?.clientHeight ?? st.h;
-      st.mobile = window.matchMedia("(max-width: 860px)").matches;
-      st.lift = hero ? parseFloat(getComputedStyle(hero).getPropertyValue("--lift")) || 1 : 1;
-      const ppu = st.h / (2 * DISTANCE * Math.tan(MathUtils.degToRad(FOV / 2)));
-      // as tall as the CSS phone was (268 px wide, 32vw at most), within the box
-      const phonePx = st.mobile
-        ? Math.min(bh * 0.84, bw * 0.9)
-        : Math.min(2.09 * Math.min(268, 0.32 * window.innerWidth), bh * 0.86);
-      st.scale = phonePx / ppu;
-      // the phone's centre, in box pixels, then in canvas pixels
-      const cx = (st.mobile ? bw * 0.5 : bw * 0.86 - phonePx * 0.3) - st.offX;
-      const cy = bh * (st.mobile ? 0.5 : 0.56) - st.offY;
-      camera.setViewOffset(st.w, st.h, st.w / 2 - cx, st.h / 2 - cy, st.w, st.h);
-      camera.updateProjectionMatrix();
-    }
+    const L = shared.layout;
+    if (!L) return;
+    const w = size.width;
+    const h = size.height;
 
-    // the lift
+    // the clock
     const K = shared.reduced ? 1 : shared.startAt == null ? 0 : clamp((now - shared.startAt - START) / DURATION);
-    const e = easeOut(K) * st.lift;
+    const eased = easeOut(K);
+    const e = eased * L.lift;
+
+    // the device: pose and place both move with the lift
+    if (pose.current) pose.current.quaternion.slerpQuaternions(REST_Q, LIFTED_Q, eased);
+    const cx = L.rest.x + (L.lifted.x - L.rest.x) * eased;
+    const cy = L.rest.y + (L.lifted.y - L.rest.y) * eased;
+    const ppu = h / (2 * DISTANCE * Math.tan(MathUtils.degToRad(FOV / 2)));
+    camera.setViewOffset(w, h, w / 2 - cx, h / 2 - cy, w, h);
+    camera.updateProjectionMatrix();
+
+    // the cards
     const n = CARDS.length;
     CARDS.forEach((c, i) => {
       const card = cards.current[i];
       const shadow = shadows.current[i];
       if (!card || !shadow) return;
       const rank = n - i;
-      const k = rank * e * DEPTH;
       const y = SCREEN.h / 2 - (c.top + c.height / 2) * SCREEN.h;
-      card.position.set(PER_RANK.x * k, y + PER_RANK.y * k, SCREEN.z + 0.0015 + 0.0005 * rank + PER_RANK.z * k);
-      // the shadow stays a little behind and below its card, and darkens as it rises
-      shadow.position.set(card.position.x, card.position.y - 0.012 * e, card.position.z - 0.012);
+      card.position.set(
+        (BASE.x + PER_RANK.x * rank) * e,
+        y + (BASE.y + PER_RANK.y * rank) * e,
+        SCREEN.z + 0.0015 + 0.0005 * rank + (BASE.z + PER_RANK.z * rank) * e,
+      );
+    });
+    // each card casts a soft drop shadow in its own plane, down the phone,
+    // as a CSS box-shadow would: it lands on the card below or the screen
+    CARDS.forEach((_, i) => {
+      const card = cards.current[i];
+      const shadow = shadows.current[i];
+      if (!card || !shadow) return;
       const sm = shadowMats[i];
+      const pad = 0.03;
+      shadow.position.set(card.position.x + 0.004 * e, card.position.y - 0.022 * e, card.position.z - 0.002);
+      shadow.scale.set(sm.uniforms.size.value.x + 2 * pad, sm.uniforms.size.value.y + 2 * pad, 1);
+      sm.uniforms.pad.value.setScalar(pad);
       sm.uniforms.strength.value = (sm.userData.k ?? 0.6) * Math.min(1, e * 3);
     });
 
@@ -212,7 +252,7 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
     st.cur.x += (tx - st.cur.x) * f;
     st.cur.y += (ty - st.cur.y) * f;
     if (rig.current) {
-      rig.current.scale.setScalar(st.scale);
+      rig.current.scale.setScalar(L.phonePx / ppu);
       rig.current.rotation.set(st.cur.y, st.cur.x + drift, 0);
     }
 
@@ -223,10 +263,10 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
       card.updateWorldMatrix(true, false);
       v.set(-(SCREEN.w * 0.92) / 2, 0, 0);
       card.localToWorld(v).project(camera);
-      const x = ((v.x + 1) / 2) * st.w;
-      const y = ((1 - v.y) / 2) * st.h;
-      label.style.left = `${x + st.offX - 12}px`;
-      label.style.top = `${y + st.offY}px`;
+      const x = ((v.x + 1) / 2) * w;
+      const y = ((1 - v.y) / 2) * h;
+      label.style.left = `${x + L.offX - 8}px`;
+      label.style.top = `${y + L.offY}px`;
       const on = clamp((K - i * 0.09) / 0.55) > 0.6;
       if (st.on[i] !== on) {
         st.on[i] = on;
@@ -244,7 +284,7 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
 
   return (
     <group ref={rig}>
-      <group rotation={POSE}>
+      <group ref={pose}>
         <Device material={screen} />
         {CARDS.map((c, i) => (
           <group key={c.top}>
@@ -255,7 +295,7 @@ function Rig({ shared: sharedRef }: { shared: RefObject<Shared> }) {
               material={shadowMats[i]}
               renderOrder={1 + (CARDS.length - 1 - i) * 2}
             >
-              <planeGeometry args={[SCREEN.w * 0.92 + 0.07, SCREEN.h * c.height + 0.07]} />
+              <planeGeometry args={[1, 1]} />
             </mesh>
             <mesh
               ref={(m) => {
@@ -307,6 +347,7 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
       labels: [],
       hero: null,
       canvasBox: null,
+      layout: null,
       wake: () => {},
       sleep: () => {},
       ready: () => {},
@@ -358,6 +399,55 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
     }
     window.addEventListener("burly:splash-done", go);
 
+    // Layout. Desktop: the canvas spans from the copy column's right edge to
+    // the hero's right edge, full hero height, so lifted cards never clip and
+    // never cover the copy. Mobile: the CSS box.
+    const section = hero?.closest<HTMLElement>(".hero") ?? null;
+    const copy = section?.querySelector<HTMLElement>(".hero-copy") ?? null;
+    const wrap = section?.querySelector<HTMLElement>(".wrap") ?? null;
+    const measure = () => {
+      if (!box || !hero) return;
+      const lift = parseFloat(getComputedStyle(hero).getPropertyValue("--lift")) || 1;
+      const mobile = window.matchMedia("(max-width: 860px)").matches;
+      if (mobile || !section || !copy || !wrap) {
+        box.style.left = box.style.top = box.style.width = box.style.height = box.style.right = box.style.bottom = "";
+        const bw = hero.clientWidth;
+        const bh = hero.clientHeight;
+        const phonePx = Math.min(bh * 0.8, bw * 0.85);
+        const at = new Vector2(bw * 0.5 - box.offsetLeft, bh * 0.52 - box.offsetTop);
+        shared.layout = { offX: box.offsetLeft, offY: box.offsetTop, phonePx, rest: at, lifted: at.clone(), mobile: true, lift };
+      } else {
+        const hs = section.clientHeight;
+        const ws = section.clientWidth;
+        const heroAt = offsetIn(hero, section);
+        const wrapAt = offsetIn(wrap, section);
+        const left = offsetIn(copy, section).x + copy.offsetWidth + 16;
+        const offX = left - heroAt.x;
+        const offY = -heroAt.y;
+        box.style.left = `${offX}px`;
+        box.style.top = `${offY}px`;
+        box.style.width = `${ws - left}px`;
+        box.style.height = `${hs}px`;
+        box.style.right = box.style.bottom = "auto";
+        const ww = wrap.clientWidth;
+        const place = (f: Vector2) => new Vector2(wrapAt.x + f.x * ww - left, f.y * hs);
+        shared.layout = {
+          offX,
+          offY,
+          phonePx: Math.min(PHONE_OF_HERO * hs, 0.52 * ww),
+          rest: place(REST_AT),
+          lifted: place(LIFTED_AT),
+          mobile: false,
+          lift,
+        };
+      }
+      shared.wake();
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    if (section) ro?.observe(section);
+    window.addEventListener("resize", measure);
+
     const io =
       hero && typeof IntersectionObserver !== "undefined"
         ? new IntersectionObserver(([en]) => {
@@ -383,6 +473,8 @@ export default function HeroScene({ onReady }: { onReady?: () => void }) {
       mo?.disconnect();
       window.removeEventListener("burly:splash-done", go);
       io?.disconnect();
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
       window.removeEventListener("pointermove", onPointer);
     };
   }, []);
