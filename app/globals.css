@@ -991,7 +991,7 @@ footer .wrap {
 footer .credit {
   margin: 10px auto 0;
   font-size: 11px;
-  color: var(--text-tertiary, #5e6166);
+  color: var(--text-faint);
 }
 
 footer a {
