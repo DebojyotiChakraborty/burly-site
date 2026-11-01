@@ -59,6 +59,7 @@ export default function PrivacyPage() {
 
       <h2>This website</h2>
       <p>This site is static. It sets one value in your browser&apos;s local storage to remember your light or dark choice and one session flag so the loading animation plays once. It has no cookies, no analytics and no third party scripts. If you join the waitlist, the email you enter is used only to send you the TestFlight or beta invitation and release news, and you can ask for it to be removed at any time.</p>
+      <p>Waitlist emails submitted on this website are stored by Resend, the email service that sends the launch announcement and handles unsubscribes. Resend keeps only the address and the time you signed up, under its own privacy policy. Nothing from the app itself is ever sent there: the waitlist is a feature of this website, not of Burly on your phone.</p>
 
       <h2>Children</h2>
       <p>Burly is not directed at children under 13 and does not knowingly collect anything from them. Since the app keeps all data on the device, no data about anyone is held by us.</p>
