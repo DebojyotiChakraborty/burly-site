@@ -99,6 +99,12 @@ export async function POST(request: Request) {
   const added = await resend.contacts.segments.add({ email, segmentId: audienceId });
   if (!added.error) return json({ ok: true });
 
-  console.error("[waitlist] Resend error:", error.name, error.statusCode, "/", added.error.name, added.error.statusCode);
+  // Server log only; the client never sees Resend's wording.
+  console.error(
+    "[waitlist] Resend error:",
+    `${error.name} ${error.statusCode ?? ""} (${error.message})`,
+    "/ segment add:",
+    `${added.error.name} ${added.error.statusCode ?? ""} (${added.error.message})`,
+  );
   return json({ ok: false, error: "Could not save your email right now. Please try again." }, 502);
 }
