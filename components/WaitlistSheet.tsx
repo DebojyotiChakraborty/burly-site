@@ -7,9 +7,12 @@ export default function WaitlistSheet() {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
   const [invalid, setInvalid] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
   const [source, setSource] = useState("");
   const panel = useRef<HTMLDivElement>(null);
   const email = useRef<HTMLInputElement>(null);
+  const company = useRef<HTMLInputElement>(null);
   const opener = useRef<Element | null>(null);
   const openRef = useRef(false);
 
@@ -48,8 +51,9 @@ export default function WaitlistSheet() {
     if (!panel.current?.contains(e.target as Node)) close();
   };
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (pending) return;
     const value = (email.current?.value || "").trim();
     if (!value || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
       email.current?.focus();
@@ -57,9 +61,25 @@ export default function WaitlistSheet() {
       return;
     }
     setInvalid(false);
-    // No backend yet: the sheet only shows the confirmation state. Wire the
-    // form to a list provider (POST this value) before launch.
-    setDone(true);
+    setError("");
+    setPending(true);
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: value, company: company.current?.value || "" }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (res.ok && data?.ok) {
+        setDone(true);
+      } else {
+        setError(data?.error || "Something went wrong. Please try again.");
+      }
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -98,10 +118,21 @@ export default function WaitlistSheet() {
                 placeholder="you@example.com"
                 required
                 aria-invalid={invalid ? "true" : undefined}
+                aria-describedby={error ? "wl-error" : undefined}
               />
             </div>
-            <button className="btn primary wl-submit" type="submit">
-              Join the waitlist
+            {/* Honeypot: hidden from people, filled in by bots. The server drops any submission that sets it. */}
+            <div className="wl-trap" aria-hidden="true">
+              <label htmlFor="wl-company">Company</label>
+              <input ref={company} id="wl-company" type="text" name="company" tabIndex={-1} autoComplete="off" />
+            </div>
+            {error && (
+              <p className="wl-error" id="wl-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button className="btn primary wl-submit" type="submit" disabled={pending} aria-busy={pending ? "true" : undefined}>
+              {pending ? "Joining" : "Join the waitlist"}
               <svg aria-hidden="true">
                 <use href="#i-arrow" />
               </svg>

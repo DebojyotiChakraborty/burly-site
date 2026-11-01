@@ -1278,6 +1278,23 @@ footer a:hover {
   border: 0;
   border-radius: 10px;
 }
+.wl-trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.wl-error {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--accent);
+}
+.wl-submit[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
 .wl-fine {
   color: var(--text-dim);
   font-size: 12px;
