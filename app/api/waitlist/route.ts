@@ -7,6 +7,10 @@ import { Resend } from "resend";
  * Adds the email to the Resend audience (Resend now calls these "segments";
  * RESEND_AUDIENCE_ID holds the segment's id). `company` is a honeypot: humans
  * never see the field, so a filled value is dropped with a 200 and no call.
+ *
+ * Resend API: POST /contacts with `segments: [{ id }]` (the `audienceId`
+ * form is deprecated). The key must be a "full access" key; a sending-only
+ * key gets 401 restricted_api_key on the contacts endpoints.
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -78,13 +82,23 @@ export async function POST(request: Request) {
     segments: [{ id: audienceId }],
   });
 
-  if (error) {
-    // A contact that is already on the list counts as joined.
-    const msg = error.message?.toLowerCase() ?? "";
-    if (error.statusCode === 409 || msg.includes("already exist")) return json({ ok: true });
-    console.error("[waitlist] Resend error:", error.name, error.statusCode);
-    return json({ ok: false, error: "Could not save your email right now. Please try again." }, 502);
+  if (!error) return json({ ok: true });
+
+  // Configuration problems: say so in the server log, never to the client.
+  if (error.name === "restricted_api_key" || error.name === "invalid_api_key" || error.name === "missing_api_key") {
+    console.error("[waitlist] Resend rejected the API key (needs a full access key):", error.name);
+    return json({ ok: false, error: "The waitlist is not set up yet. Please try again later." }, 503);
+  }
+  if (error.name === "rate_limit_exceeded") {
+    return json({ ok: false, error: "Too many signups right now. Please try again in a minute." }, 503);
   }
 
-  return json({ ok: true });
+  // Resend does not document the response for an email that already exists.
+  // Whatever create returned, adding the existing contact to the segment is
+  // idempotent for our purposes: if that succeeds, the address is on the list.
+  const added = await resend.contacts.segments.add({ email, segmentId: audienceId });
+  if (!added.error) return json({ ok: true });
+
+  console.error("[waitlist] Resend error:", error.name, error.statusCode, "/", added.error.name, added.error.statusCode);
+  return json({ ok: false, error: "Could not save your email right now. Please try again." }, 502);
 }
