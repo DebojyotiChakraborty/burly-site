@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Privacy policy"
       title="Your training stays on your phone."
-      updated="1 November 2026"
+      updated="15 November 2026"
       intro="Burly is an offline workout log. There is no account, no server and no analytics. This page lists every kind of data the app handles, where it lives, and the only ways it can leave your device, which are all actions you take yourself."
     >
       <h2>What the app stores</h2>
@@ -58,8 +58,8 @@ export default function PrivacyPage() {
       <p>System backups made by iOS or Android (iCloud Backup, Google One) may include the app&apos;s storage if you have those enabled. They are governed by Apple&apos;s and Google&apos;s policies, not ours.</p>
 
       <h2>This website</h2>
-      <p>This site has no accounts and one form, the waitlist. It sets one value in your browser&apos;s local storage to remember your light or dark choice and one session flag so the loading animation plays once. It has no cookies, no analytics and no third party scripts. If you join the waitlist, the email you enter is used only to send you the TestFlight or beta invitation and release news, and you can ask for it to be removed at any time.</p>
-      <p>Waitlist emails submitted on this website are stored by Resend, the email service that sends the launch announcement and handles unsubscribes. Resend keeps only the address and the time you signed up, under its own privacy policy. Nothing from the app itself is ever sent there: the waitlist is a feature of this website, not of Burly on your phone. To slow down abuse, the address your signup request comes from is counted in memory for a few minutes and is not saved.</p>
+      <p>This site has no accounts and one form, the waitlist. It sets one value in your browser&apos;s local storage to remember your light or dark choice and one session flag so the loading animation plays once. It has no cookies, no analytics and no third party scripts. If you join the waitlist, the email you enter is used only to send you a confirmation when you sign up, the TestFlight or beta invitation and release news, and you can ask for it to be removed at any time.</p>
+      <p>Waitlist emails submitted on this website are stored by Resend, the email service that sends the signup confirmation and the launch announcement and handles unsubscribes. Resend keeps only the address, the time you signed up and a record of the emails it sent you, under its own privacy policy. Nothing from the app itself is ever sent there: the waitlist is a feature of this website, not of Burly on your phone. To slow down abuse, the address your signup request comes from is counted in memory for a few minutes and is not saved.</p>
 
       <h2>Children</h2>
       <p>Burly is not directed at children under 13 and does not knowingly collect anything from them. Since the app keeps all data on the device, no data about anyone is held by us.</p>
