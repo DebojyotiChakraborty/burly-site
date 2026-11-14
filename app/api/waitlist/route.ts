@@ -57,8 +57,11 @@ type ResendError = { name: string; message: string; statusCode: number | null };
 type ResendResult = { error: ResendError | null; headers: Record<string, string> | null };
 
 /** Runs one Resend call with a timeout; a thrown or aborted call becomes an error result. */
-async function call(fn: (signal: AbortSignal) => Promise<ResendResult>): Promise<ResendResult> {
-  const signal = AbortSignal.timeout(RESEND_TIMEOUT_MS);
+async function call(
+  fn: (signal: AbortSignal) => Promise<ResendResult>,
+  timeoutMs = RESEND_TIMEOUT_MS,
+): Promise<ResendResult> {
+  const signal = AbortSignal.timeout(timeoutMs);
   const timedOut: ResendResult = {
     error: { name: "timeout", message: "Resend did not answer in time", statusCode: null },
     headers: null,
@@ -89,6 +92,10 @@ let warnedNoConfirmations = false;
 // the last 24 hours: the confirmation went out (or is going out) already.
 const ALREADY_SENT = ["invalid_idempotent_request", "concurrent_idempotent_requests"];
 
+// The lookup only decides whether to send a confirmation, so it gets a short
+// leash: a slow answer must not hold up the signup itself.
+const LOOKUP_TIMEOUT_MS = 2500;
+
 /**
  * True only when Resend says the address is already a contact. A 404 means
  * new. Anything else (timeout, outage, rate limit, key error) counts as new
@@ -96,7 +103,7 @@ const ALREADY_SENT = ["invalid_idempotent_request", "concurrent_idempotent_reque
  * still caps it. A key error falls through to create, which reports it.
  */
 async function isExistingContact(resend: Resend, email: string): Promise<boolean> {
-  const found = await call((signal) => resend.contacts.get({ email }, { signal }));
+  const found = await call((signal) => resend.contacts.get({ email }, { signal }), LOOKUP_TIMEOUT_MS);
   if (!found.error) return true;
   if (found.error.statusCode !== 404 && found.error.name !== "not_found") {
     console.error("[waitlist] lookup failed:", describe(found.error));
