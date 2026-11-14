@@ -4,12 +4,16 @@ import SiteSplash from "@/components/splash/SiteSplash";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://burlylog.com"),
+  alternates: { canonical: "/" },
   title: "Burly, the workout log that keeps up with you",
   description:
     "Burly is a calm, offline workout log for people who lift. Two taps to log a set, every stat explained, strength ranks and badges, nothing leaves your phone.",
   openGraph: {
     title: "Burly",
     description: "Lift. Log. Level up. The workout log that keeps up with you.",
+    url: "https://burlylog.com",
+    siteName: "Burly",
   },
   icons: {
     icon: [

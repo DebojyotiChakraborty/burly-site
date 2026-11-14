@@ -14,5 +14,6 @@ next-env.d.ts
 /coverage
 *.pem
 .env*
+!.env.example
 .vercel
 .screenshots/
