@@ -48,10 +48,17 @@ type ResendResult = { error: ResendError | null; headers: Record<string, string>
 
 /** Runs one Resend call with a timeout; a thrown or aborted call becomes an error result. */
 async function call(fn: (signal: AbortSignal) => Promise<ResendResult>): Promise<ResendResult> {
+  const signal = AbortSignal.timeout(RESEND_TIMEOUT_MS);
+  const timedOut: ResendResult = {
+    error: { name: "timeout", message: "Resend did not answer in time", statusCode: null },
+    headers: null,
+  };
   try {
-    return await fn(AbortSignal.timeout(RESEND_TIMEOUT_MS));
+    const result = await fn(signal);
+    // The SDK turns an aborted fetch into a generic application_error.
+    return result.error && signal.aborted ? timedOut : result;
   } catch {
-    return { error: { name: "timeout", message: "Resend did not answer in time", statusCode: null }, headers: null };
+    return timedOut;
   }
 }
 
