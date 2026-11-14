@@ -15,8 +15,12 @@ import { waitlistConfirmation } from "@/lib/waitlist-email";
  * form is deprecated). The key must be a "Full access" key; a sending-only
  * key gets 401 restricted_api_key on the contacts endpoints.
  *
- * Once the address is saved, one confirmation email is sent after the
- * response (see sendConfirmation). It never changes the signup result.
+ * Confirmations go to first-time signups only. When WAITLIST_FROM is set,
+ * GET /contacts/{email} runs before the save; if the address is already a
+ * contact, no email is sent. Once a new address is saved, one confirmation
+ * goes out after the response (see sendConfirmation); its idempotency key is
+ * a backstop of one per address per 24 hours. Neither the lookup nor the
+ * email ever changes the signup result.
  */
 
 // Deliberately conservative: the address is also used as a URL path segment
@@ -84,6 +88,21 @@ let warnedNoConfirmations = false;
 // Resend answers 409 with these when the idempotency key was already used in
 // the last 24 hours: the confirmation went out (or is going out) already.
 const ALREADY_SENT = ["invalid_idempotent_request", "concurrent_idempotent_requests"];
+
+/**
+ * True only when Resend says the address is already a contact. A 404 means
+ * new. Anything else (timeout, outage, rate limit, key error) counts as new
+ * too, so a new person is never denied a confirmation; the idempotency key
+ * still caps it. A key error falls through to create, which reports it.
+ */
+async function isExistingContact(resend: Resend, email: string): Promise<boolean> {
+  const found = await call((signal) => resend.contacts.get({ email }, { signal }));
+  if (!found.error) return true;
+  if (found.error.statusCode !== 404 && found.error.name !== "not_found") {
+    console.error("[waitlist] lookup failed:", describe(found.error));
+  }
+  return false;
+}
 
 /**
  * Sends the signup confirmation. Off when WAITLIST_FROM is empty. The
@@ -156,6 +175,9 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(apiKey);
+  // Only look the address up when confirmations are on: no extra call otherwise.
+  const existed = process.env.WAITLIST_FROM?.trim() ? await isExistingContact(resend, email) : false;
+
   const create = () =>
     call((signal) =>
       resend.contacts.create({ email, unsubscribed: false, segments: [{ id: audienceId }] }, { signal }),
@@ -169,9 +191,10 @@ export async function POST(request: Request) {
     await new Promise((r) => setTimeout(r, wait * 1000));
     created = await create();
   }
-  // The address is on the list: answer now, confirm by email after the response.
+  // The address is on the list: answer now, and confirm by email after the
+  // response if it was not on the list before.
   const saved = () => {
-    after(() => sendConfirmation(resend, email));
+    if (!existed) after(() => sendConfirmation(resend, email));
     return json({ ok: true });
   };
 
