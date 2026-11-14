@@ -44,8 +44,11 @@ and counts as a successful signup.
 ### Confirmation email
 
 Once the address is saved, the route sends one confirmation email (content in
-`lib/waitlist-email.ts`) after the response has gone out, using `after()` from `next/server`. Two
-optional variables control it:
+`lib/waitlist-email.ts`) after the response has gone out, using `after()` from `next/server`.
+Confirmations go to first-time signups only: before saving, the route looks the address up in
+Resend and skips the email if it is already a contact. If the lookup fails or times out, the
+address is treated as new; the 24 hour idempotency key below remains as a backstop. With
+confirmations off there is no lookup. Two optional variables control it:
 
 - `WAITLIST_FROM`: the sender, in the form `Burly <name@your-domain>`, on a domain verified in
   Resend. Leave it empty and confirmations are off: signups work exactly as before and the server
