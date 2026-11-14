@@ -12,7 +12,7 @@ export default function TermsPage() {
     <LegalPage
       eyebrow="Terms of use"
       title="Plain terms for a beta."
-      updated="1 November 2026"
+      updated="15 November 2026"
       intro="By installing Burly or joining the waitlist you agree to these terms. They are short because the app is simple: it runs on your phone, keeps your data there, and is free while in beta."
     >
       <h2>The app</h2>
@@ -46,7 +46,7 @@ export default function TermsPage() {
       <p>Burly, its mascot, icons, sounds and interface are our work and may not be copied. The 3D phone shown on this website is a third party model used under a Creative Commons licence; its credit is in the footer.</p>
 
       <h2>The waitlist</h2>
-      <p>Joining the waitlist means you agree to receive invitation and release emails about Burly. Every email includes a way to leave the list. Invitations are limited and are sent in the order people joined.</p>
+      <p>Joining the waitlist means you agree to receive one confirmation email when you sign up, then invitation and release emails about Burly. Every invitation and release email includes a way to leave the list. Invitations are limited and are sent in the order people joined.</p>
 
       <h2>Changes</h2>
       <p>These terms may be updated as the app leaves beta. The date at the top shows the current version. Continuing to use the app after a change means you accept the new terms. Questions go through the support link on the app&apos;s store listing.</p>
