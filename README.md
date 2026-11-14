@@ -39,4 +39,26 @@ What the route does, in order: accepts JSON only, drops honeypot submissions wit
 validates the email, applies a best-effort per-IP limit (5 per 10 minutes, kept in memory, so it
 does not survive across serverless instances), then creates the contact with an 8 second timeout
 and one retry if Resend rate limits. An address that is already a contact is added to the segment
-and counts as a successful signup. Nothing is emailed at signup.
+and counts as a successful signup.
+
+### Confirmation email
+
+Once the address is saved, the route sends one confirmation email (content in
+`lib/waitlist-email.ts`) after the response has gone out, using `after()` from `next/server`.
+Confirmations go to first-time signups only: before saving, the route looks the address up in
+Resend and skips the email if it is already a contact. If the lookup fails or times out, the
+address is treated as new; the 24 hour idempotency key below remains as a backstop. With
+confirmations off there is no lookup. Two optional variables control it:
+
+- `WAITLIST_FROM`: the sender, in the form `Burly <name@your-domain>`, on a domain verified in
+  Resend. Leave it empty and confirmations are off: signups work exactly as before and the server
+  logs once that confirmations are off.
+- `WAITLIST_REPLY_TO`: an optional reply-to address.
+
+Each send carries an idempotency key derived from the address, so Resend sends at most one
+confirmation per address per 24 hours however often the form is submitted; a repeat inside that
+window is treated as already sent. A confirmation that fails, times out (same 8 second limit) or
+hits a quota is logged as `[waitlist] confirmation not sent: ...` and never fails the signup: the
+visitor still gets `{ ok: true }`. Every confirmation counts toward Resend's free transactional
+quota (100 emails a day, 3,000 a month); once that is used up, signups are still saved but go
+unconfirmed until the quota resets.

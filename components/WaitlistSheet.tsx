@@ -139,7 +139,7 @@ export default function WaitlistSheet() {
               </svg>
             </button>
           </form>
-          <p className="wl-fine">One email when the beta opens. No newsletter, no sharing.</p>
+          <p className="wl-fine">A confirmation now, then one email when the beta opens. No newsletter, no sharing.</p>
           <div className="wl-done">
             <b>You&apos;re on the list.</b>
             <p>The link lands in your inbox the day the beta opens.</p>

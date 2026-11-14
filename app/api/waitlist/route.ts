@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
+import { after } from "next/server";
 import { Resend } from "resend";
+import { waitlistConfirmation } from "@/lib/waitlist-email";
 
 /**
  * POST /api/waitlist
@@ -11,6 +14,13 @@ import { Resend } from "resend";
  * Resend API: POST /contacts with `segments: [{ id }]` (the `audienceId`
  * form is deprecated). The key must be a "Full access" key; a sending-only
  * key gets 401 restricted_api_key on the contacts endpoints.
+ *
+ * Confirmations go to first-time signups only. When WAITLIST_FROM is set,
+ * GET /contacts/{email} runs before the save; if the address is already a
+ * contact, no email is sent. Once a new address is saved, one confirmation
+ * goes out after the response (see sendConfirmation); its idempotency key is
+ * a backstop of one per address per 24 hours. Neither the lookup nor the
+ * email ever changes the signup result.
  */
 
 // Deliberately conservative: the address is also used as a URL path segment
@@ -47,11 +57,21 @@ type ResendError = { name: string; message: string; statusCode: number | null };
 type ResendResult = { error: ResendError | null; headers: Record<string, string> | null };
 
 /** Runs one Resend call with a timeout; a thrown or aborted call becomes an error result. */
-async function call(fn: (signal: AbortSignal) => Promise<ResendResult>): Promise<ResendResult> {
+async function call(
+  fn: (signal: AbortSignal) => Promise<ResendResult>,
+  timeoutMs = RESEND_TIMEOUT_MS,
+): Promise<ResendResult> {
+  const signal = AbortSignal.timeout(timeoutMs);
+  const timedOut: ResendResult = {
+    error: { name: "timeout", message: "Resend did not answer in time", statusCode: null },
+    headers: null,
+  };
   try {
-    return await fn(AbortSignal.timeout(RESEND_TIMEOUT_MS));
+    const result = await fn(signal);
+    // The SDK turns an aborted fetch into a generic application_error.
+    return result.error && signal.aborted ? timedOut : result;
   } catch {
-    return { error: { name: "timeout", message: "Resend did not answer in time", statusCode: null }, headers: null };
+    return timedOut;
   }
 }
 
@@ -66,6 +86,56 @@ function isKeyError(e: ResendError): boolean {
 const describe = (e: ResendError) => `${e.name} ${e.statusCode ?? ""} (${e.message})`;
 
 let warnedMissingEnv = false;
+let warnedNoConfirmations = false;
+
+// Resend answers 409 with these when the idempotency key was already used in
+// the last 24 hours: the confirmation went out (or is going out) already.
+const ALREADY_SENT = ["invalid_idempotent_request", "concurrent_idempotent_requests"];
+
+// The lookup only decides whether to send a confirmation, so it gets a short
+// leash: a slow answer must not hold up the signup itself.
+const LOOKUP_TIMEOUT_MS = 2500;
+
+/**
+ * True only when Resend says the address is already a contact. A 404 means
+ * new. Anything else (timeout, outage, rate limit, key error) counts as new
+ * too, so a new person is never denied a confirmation; the idempotency key
+ * still caps it. A key error falls through to create, which reports it.
+ */
+async function isExistingContact(resend: Resend, email: string): Promise<boolean> {
+  const found = await call((signal) => resend.contacts.get({ email }, { signal }), LOOKUP_TIMEOUT_MS);
+  if (!found.error) return true;
+  if (found.error.statusCode !== 404 && found.error.name !== "not_found") {
+    console.error("[waitlist] lookup failed:", describe(found.error));
+  }
+  return false;
+}
+
+/**
+ * Sends the signup confirmation. Off when WAITLIST_FROM is empty. The
+ * idempotency key is derived from the address, so Resend sends at most one
+ * per address per 24 hours however often the form is submitted. Failures,
+ * including the free plan's daily or monthly quota, are logged and dropped.
+ */
+async function sendConfirmation(resend: Resend, email: string): Promise<void> {
+  const from = process.env.WAITLIST_FROM?.trim();
+  if (!from) {
+    if (!warnedNoConfirmations) {
+      warnedNoConfirmations = true;
+      console.info("[waitlist] WAITLIST_FROM is not set; confirmation emails are off.");
+    }
+    return;
+  }
+  const replyTo = process.env.WAITLIST_REPLY_TO?.trim() || undefined;
+  const { subject, html, text } = waitlistConfirmation();
+  const idempotencyKey = "waitlist-confirm-" + createHash("sha256").update(email).digest("hex");
+
+  const sent = await call((signal) =>
+    resend.emails.send({ from, to: email, replyTo, subject, html, text }, { idempotencyKey, signal }),
+  );
+  if (!sent.error || ALREADY_SENT.includes(sent.error.name)) return;
+  console.error("[waitlist] confirmation not sent:", describe(sent.error));
+}
 
 function json(body: { ok: true } | { ok: false; error: string }, status = 200) {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -112,6 +182,9 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(apiKey);
+  // Only look the address up when confirmations are on: no extra call otherwise.
+  const existed = process.env.WAITLIST_FROM?.trim() ? await isExistingContact(resend, email) : false;
+
   const create = () =>
     call((signal) =>
       resend.contacts.create({ email, unsubscribed: false, segments: [{ id: audienceId }] }, { signal }),
@@ -125,7 +198,14 @@ export async function POST(request: Request) {
     await new Promise((r) => setTimeout(r, wait * 1000));
     created = await create();
   }
-  if (!created.error) return json({ ok: true });
+  // The address is on the list: answer now, and confirm by email after the
+  // response if it was not on the list before.
+  const saved = () => {
+    if (!existed) after(() => sendConfirmation(resend, email));
+    return json({ ok: true });
+  };
+
+  if (!created.error) return saved();
 
   // Configuration problems: say so in the server log, never to the client.
   if (isKeyError(created.error)) {
@@ -148,7 +228,7 @@ export async function POST(request: Request) {
   // Whatever 4xx create returned, adding the existing contact to the segment
   // is idempotent for our purposes: if that succeeds, the address is on the list.
   const added = await call((signal) => resend.contacts.segments.add({ email, segmentId: audienceId }, { signal }));
-  if (!added.error) return json({ ok: true });
+  if (!added.error) return saved();
 
   // Server log only; the client never sees Resend's wording.
   console.error("[waitlist] Resend error:", describe(created.error), "/ segment add:", describe(added.error));
