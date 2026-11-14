@@ -2,18 +2,21 @@ import { Resend } from "resend";
 
 /**
  * POST /api/waitlist
- * Body: { email: string, company?: string }
+ * Body (JSON): { email: string, hp?: string }
  *
  * Adds the email to the Resend audience (Resend now calls these "segments";
- * RESEND_AUDIENCE_ID holds the segment's id). `company` is a honeypot: humans
+ * RESEND_AUDIENCE_ID holds the segment's id). `hp` is a honeypot: humans
  * never see the field, so a filled value is dropped with a 200 and no call.
  *
  * Resend API: POST /contacts with `segments: [{ id }]` (the `audienceId`
- * form is deprecated). The key must be a "full access" key; a sending-only
+ * form is deprecated). The key must be a "Full access" key; a sending-only
  * key gets 401 restricted_api_key on the contacts endpoints.
  */
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Deliberately conservative: the address is also used as a URL path segment
+// (POST /contacts/{email}/segments/{id}), so characters that could change the
+// path (/ ? # %) are not accepted.
+const EMAIL_RE = /^[a-z0-9._+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
 const EMAIL_MAX = 254;
 
 // Best-effort rate limit: one bucket per IP, kept in this process's memory.
@@ -37,11 +40,38 @@ function rateLimited(ip: string): boolean {
   return b.count > LIMIT;
 }
 
+// Resend calls get this long before the visitor is told to retry.
+const RESEND_TIMEOUT_MS = 8000;
+
+type ResendError = { name: string; message: string; statusCode: number | null };
+type ResendResult = { error: ResendError | null; headers: Record<string, string> | null };
+
+/** Runs one Resend call with a timeout; a thrown or aborted call becomes an error result. */
+async function call(fn: (signal: AbortSignal) => Promise<ResendResult>): Promise<ResendResult> {
+  try {
+    return await fn(AbortSignal.timeout(RESEND_TIMEOUT_MS));
+  } catch {
+    return { error: { name: "timeout", message: "Resend did not answer in time", statusCode: null }, headers: null };
+  }
+}
+
+/** True when Resend refuses the key itself: wrong, deleted, inactive, suspended or sending-only. */
+function isKeyError(e: ResendError): boolean {
+  return (
+    ["restricted_api_key", "missing_api_key", "invalid_api_key", "suspended_api_key", "invalid_permission"].includes(e.name) ||
+    /api key/i.test(e.message ?? "")
+  );
+}
+
+const describe = (e: ResendError) => `${e.name} ${e.statusCode ?? ""} (${e.message})`;
+
 let warnedMissingEnv = false;
 
 function json(body: { ok: true } | { ok: false; error: string }, status = 200) {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
 }
+
+const NOT_SET_UP = "The waitlist is not set up yet. Please try again later.";
 
 export async function POST(request: Request) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -51,7 +81,13 @@ export async function POST(request: Request) {
       warnedMissingEnv = true;
       console.error("[waitlist] RESEND_API_KEY or RESEND_AUDIENCE_ID is not set; signups are disabled.");
     }
-    return json({ ok: false, error: "The waitlist is not set up yet. Please try again later." }, 503);
+    return json({ ok: false, error: NOT_SET_UP }, 503);
+  }
+
+  // Only JSON. A cross-site form or a no-preflight fetch cannot send this
+  // content type, so other pages cannot submit on a visitor's behalf.
+  if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    return json({ ok: false, error: "Send a JSON body with an email." }, 415);
   }
 
   let body: unknown;
@@ -60,10 +96,10 @@ export async function POST(request: Request) {
   } catch {
     return json({ ok: false, error: "Send a JSON body with an email." }, 400);
   }
-  const { email: rawEmail, company } = (body ?? {}) as { email?: unknown; company?: unknown };
+  const { email: rawEmail, hp } = (body ?? {}) as { email?: unknown; hp?: unknown };
 
   // Honeypot: bots fill every field. Pretend it worked and do nothing.
-  if (typeof company === "string" && company.trim() !== "") return json({ ok: true });
+  if (typeof hp === "string" && hp.trim() !== "") return json({ ok: true });
 
   const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
   if (!email || email.length > EMAIL_MAX || !EMAIL_RE.test(email)) {
@@ -76,35 +112,45 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(apiKey);
-  const { error } = await resend.contacts.create({
-    email,
-    unsubscribed: false,
-    segments: [{ id: audienceId }],
-  });
+  const create = () =>
+    call((signal) =>
+      resend.contacts.create({ email, unsubscribed: false, segments: [{ id: audienceId }] }, { signal }),
+    );
 
-  if (!error) return json({ ok: true });
+  let created = await create();
+  // Resend allows 10 requests a second per team. On a burst, wait as long as
+  // it asks (capped) and try once more before giving up.
+  if (created.error?.name === "rate_limit_exceeded") {
+    const wait = Math.min(Math.max(Number(created.headers?.["retry-after"]) || 1, 0.25), 2);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+    created = await create();
+  }
+  if (!created.error) return json({ ok: true });
 
   // Configuration problems: say so in the server log, never to the client.
-  if (error.name === "restricted_api_key" || error.name === "invalid_api_key" || error.name === "missing_api_key") {
-    console.error("[waitlist] Resend rejected the API key (needs a full access key):", error.name);
-    return json({ ok: false, error: "The waitlist is not set up yet. Please try again later." }, 503);
+  if (isKeyError(created.error)) {
+    console.error("[waitlist] Resend rejected the API key (it must be a Full access key):", describe(created.error));
+    return json({ ok: false, error: NOT_SET_UP }, 503);
   }
-  if (error.name === "rate_limit_exceeded") {
+  if (created.error.name === "rate_limit_exceeded") {
     return json({ ok: false, error: "Too many signups right now. Please try again in a minute." }, 503);
   }
 
+  // Timeouts, network failures and Resend outages: a second call would only
+  // make the visitor wait longer for the same answer.
+  const status = created.error.statusCode;
+  if (status === null || status === undefined || status >= 500) {
+    console.error("[waitlist] Resend unavailable:", describe(created.error));
+    return json({ ok: false, error: "Could not save your email right now. Please try again." }, 502);
+  }
+
   // Resend does not document the response for an email that already exists.
-  // Whatever create returned, adding the existing contact to the segment is
-  // idempotent for our purposes: if that succeeds, the address is on the list.
-  const added = await resend.contacts.segments.add({ email, segmentId: audienceId });
+  // Whatever 4xx create returned, adding the existing contact to the segment
+  // is idempotent for our purposes: if that succeeds, the address is on the list.
+  const added = await call((signal) => resend.contacts.segments.add({ email, segmentId: audienceId }, { signal }));
   if (!added.error) return json({ ok: true });
 
   // Server log only; the client never sees Resend's wording.
-  console.error(
-    "[waitlist] Resend error:",
-    `${error.name} ${error.statusCode ?? ""} (${error.message})`,
-    "/ segment add:",
-    `${added.error.name} ${added.error.statusCode ?? ""} (${added.error.message})`,
-  );
+  console.error("[waitlist] Resend error:", describe(created.error), "/ segment add:", describe(added.error));
   return json({ ok: false, error: "Could not save your email right now. Please try again." }, 502);
 }

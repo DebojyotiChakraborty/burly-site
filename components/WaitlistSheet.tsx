@@ -12,7 +12,7 @@ export default function WaitlistSheet() {
   const [source, setSource] = useState("");
   const panel = useRef<HTMLDivElement>(null);
   const email = useRef<HTMLInputElement>(null);
-  const company = useRef<HTMLInputElement>(null);
+  const trap = useRef<HTMLInputElement>(null);
   const opener = useRef<Element | null>(null);
   const openRef = useRef(false);
 
@@ -67,7 +67,7 @@ export default function WaitlistSheet() {
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: value, company: company.current?.value || "" }),
+        body: JSON.stringify({ email: value, hp: trap.current?.value || "" }),
       });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (res.ok && data?.ok) {
@@ -121,10 +121,11 @@ export default function WaitlistSheet() {
                 aria-describedby={error ? "wl-error" : undefined}
               />
             </div>
-            {/* Honeypot: hidden from people, filled in by bots. The server drops any submission that sets it. */}
+            {/* Honeypot: hidden from people, filled in by bots. The server drops any submission that sets it.
+                The name and label are meaningless on purpose so browser autofill never fills it for a real visitor. */}
             <div className="wl-trap" aria-hidden="true">
-              <label htmlFor="wl-company">Company</label>
-              <input ref={company} id="wl-company" type="text" name="company" tabIndex={-1} autoComplete="off" />
+              <label htmlFor="wl-hp">Leave this empty</label>
+              <input ref={trap} id="wl-hp" type="text" name="wl-hp" tabIndex={-1} autoComplete="off" data-1p-ignore data-lpignore="true" />
             </div>
             {error && (
               <p className="wl-error" id="wl-error" role="alert">
